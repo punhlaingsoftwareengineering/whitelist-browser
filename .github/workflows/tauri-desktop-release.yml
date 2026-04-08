@@ -32,8 +32,12 @@ jobs:
         id: ver
         shell: bash
         run: |
-          node -e "const fs=require('fs'); const p='source/whitelist-browser-desktop/src-tauri/tauri.conf.json'; const v=JSON.parse(fs.readFileSync(p,'utf8')).version; if(!v) process.exit(2); console.log('version='+v);"
-          echo "version=$(node -e \"const fs=require('fs'); const p='source/whitelist-browser-desktop/src-tauri/tauri.conf.json'; process.stdout.write(JSON.parse(fs.readFileSync(p,'utf8')).version);\")" >> "$GITHUB_OUTPUT"
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('source/whitelist-browser-desktop/src-tauri/tauri.conf.json','utf8')).version")"
+          if [ -z "$VERSION" ]; then
+            echo "No version in tauri.conf.json" >&2
+            exit 2
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create or reuse GitHub Release (single)
         env:
