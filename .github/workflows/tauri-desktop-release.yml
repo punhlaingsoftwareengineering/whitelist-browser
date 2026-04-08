@@ -13,6 +13,8 @@ on:
   workflow_dispatch:
 
 env:
+  REPO_REL: source
+  DESKTOP_DIR: whitelist-browser-desktop
   DESKTOP_REL: source/whitelist-browser-desktop
 
 jobs:
@@ -139,8 +141,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          projectPath: ${{ env.DESKTOP_REL }}
-          tauriScript: pnpm exec tauri
+          # IMPORTANT: `tauri-action` runs some git commands from `projectPath`.
+          # Since we checkout into `source/`, the `.git` directory lives at `source/.git` (repo root),
+          # not inside `source/whitelist-browser-desktop/`. So we point `projectPath` at the repo root
+          # and run the Tauri CLI inside the desktop subdirectory via pnpm's `--dir`.
+          projectPath: ${{ env.REPO_REL }}
+          tauriScript: pnpm --dir ${{ env.DESKTOP_DIR }} exec tauri
           tagName: ${{ needs.create-release.outputs.version }}
           releaseName: '${{ needs.create-release.outputs.version }}'
           releaseBody: 'See the assets to download this version and install.'

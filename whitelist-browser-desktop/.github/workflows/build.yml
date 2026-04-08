@@ -1,4 +1,4 @@
-name: 'publish'
+name: 'desktop publish (deprecated)'
 
 on:
   workflow_dispatch:
@@ -27,7 +27,10 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - name: This workflow is deprecated
+        run: |
+          echo "Use the root workflow: .github/workflows/tauri-desktop-release.yml"
+          exit 1
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm' # This must match the platform value defined above.
