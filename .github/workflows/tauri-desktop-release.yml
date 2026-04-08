@@ -1,10 +1,4 @@
-# Cross-platform Tauri build (Linux, Windows, macOS x64 + Apple Silicon).
-# - Windows: checkout under `source/` + `C:\repo` junction to avoid long path issues.
-# - macOS/Linux: checkout under `source/`; all paths use `source/whitelist-browser-desktop`.
-#
-# Secrets: TAURI_SIGNING_PRIVATE_KEY, optional TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-
-name: Desktop cross-platform build
+name: Desktop publish
 
 on:
   push:
@@ -13,9 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  REPO_REL: source
   DESKTOP_DIR: whitelist-browser-desktop
-  DESKTOP_REL: source/whitelist-browser-desktop
 
 jobs:
   create-release:
@@ -27,14 +19,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: source
 
       - name: Read desktop version
         id: ver
         shell: bash
         run: |
-          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('source/whitelist-browser-desktop/src-tauri/tauri.conf.json','utf8')).version")"
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('${{ env.DESKTOP_DIR }}/src-tauri/tauri.conf.json','utf8')).version")"
           if [ -z "$VERSION" ]; then
             echo "No version in tauri.conf.json" >&2
             exit 2
@@ -45,7 +35,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
-        working-directory: source
         run: |
           set -euo pipefail
           TAG="${{ steps.ver.outputs.version }}"
@@ -84,21 +73,6 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: source
-
-      - name: Short path symlink (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $target = (Resolve-Path "${{ github.workspace }}/source").Path
-          if (Test-Path 'C:\repo') { Remove-Item 'C:\repo' -Force }
-          New-Item -ItemType Junction -Path 'C:\repo' -Target $target
-          Add-Content -Path $env:GITHUB_ENV -Value "REPO_ROOT=C:\repo"
-
-      - name: Set repo root (Unix)
-        if: runner.os != 'Windows'
-        run: echo "REPO_ROOT=${{ github.workspace }}/source" >> "$GITHUB_ENV"
 
       - name: Linux dependencies (WebKitGTK)
         if: matrix.platform == 'ubuntu-22.04'
@@ -116,12 +90,12 @@ jobs:
         with:
           node-version: lts/*
           cache: pnpm
-          cache-dependency-path: ${{ env.DESKTOP_REL }}/pnpm-lock.yaml
+          cache-dependency-path: ${{ env.DESKTOP_DIR }}/pnpm-lock.yaml
 
       - name: Install frontend dependencies
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
-        working-directory: ${{ env.REPO_ROOT }}/whitelist-browser-desktop
+        working-directory: ${{ env.DESKTOP_DIR }}
         run: pnpm install --frozen-lockfile
 
       - name: Rust stable
@@ -132,7 +106,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: ${{ env.DESKTOP_REL }}/src-tauri -> target
+          workspaces: ${{ env.DESKTOP_DIR }}/src-tauri -> target
           key: ${{ matrix.platform }}-${{ matrix.args }}
 
       - name: Build and upload to GitHub Release
@@ -142,12 +116,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          # IMPORTANT: `tauri-action` runs some git commands from `projectPath`.
-          # Since we checkout into `source/`, the `.git` directory lives at `source/.git` (repo root),
-          # not inside `source/whitelist-browser-desktop/`. So we point `projectPath` at the repo root
-          # and run the Tauri CLI inside the desktop subdirectory via pnpm's `--dir`.
-          projectPath: ${{ env.REPO_REL }}
-          tauriScript: pnpm --dir ${{ env.DESKTOP_DIR }} exec tauri
+          projectPath: ${{ env.DESKTOP_DIR }}
+          tauriScript: pnpm exec tauri
           tagName: ${{ needs.create-release.outputs.version }}
           releaseName: '${{ needs.create-release.outputs.version }}'
           releaseBody: 'See the assets to download this version and install.'
