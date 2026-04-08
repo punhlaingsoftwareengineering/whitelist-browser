@@ -16,7 +16,41 @@ env:
   DESKTOP_REL: source/whitelist-browser-desktop
 
 jobs:
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Read desktop version
+        id: ver
+        shell: bash
+        run: |
+          node -e "const fs=require('fs'); const p='source/whitelist-browser-desktop/src-tauri/tauri.conf.json'; const v=JSON.parse(fs.readFileSync(p,'utf8')).version; if(!v) process.exit(2); console.log('version='+v);"
+          echo "version=$(node -e \"const fs=require('fs'); const p='source/whitelist-browser-desktop/src-tauri/tauri.conf.json'; process.stdout.write(JSON.parse(fs.readFileSync(p,'utf8')).version);\")" >> "$GITHUB_OUTPUT"
+
+      - name: Create or reuse GitHub Release (single)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.ver.outputs.version }}"
+          # If release exists, do nothing. Otherwise create a draft release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+          else
+            gh release create "$TAG" --draft --title "$TAG" --notes "See the assets to download this version and install."
+          fi
+
   publish-tauri:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -103,8 +137,8 @@ jobs:
         with:
           projectPath: ${{ env.DESKTOP_REL }}
           tauriScript: pnpm exec tauri
-          tagName: __VERSION__
-          releaseName: '__VERSION__'
+          tagName: ${{ needs.create-release.outputs.version }}
+          releaseName: '${{ needs.create-release.outputs.version }}'
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false

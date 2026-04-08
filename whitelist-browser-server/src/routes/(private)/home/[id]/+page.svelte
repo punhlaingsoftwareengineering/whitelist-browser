@@ -166,7 +166,7 @@
 			<p class="text-base-content/70">Proxy + allowlisted websites + device requests.</p>
 		</div>
 		<button class="btn btn-outline" type="button" onclick={rotateSecret}>
-			<RotateCw size={18} />Generate org name & secret
+			<RotateCw size={18} />Generate org code & secret
 		</button>
 	</div>
 
@@ -175,10 +175,10 @@
 			<div class="card-body">
 				<h2 class="card-title">Organization connect keys</h2>
 				<p class="text-sm text-base-content/70">
-					Desktop uses the latest org name + secret. Rotating invalidates previous secrets.
+					Desktop uses the latest org code + secret. Rotating invalidates previous secrets.
 				</p>
 				<div class="mt-3 rounded-box bg-base-200 p-4">
-					<div class="text-xs uppercase text-base-content/60">Current org name</div>
+					<div class="text-xs uppercase text-base-content/60">Current org code</div>
 					<div class="font-mono">{activeSecret?.orgNameCurrent ?? '(not generated yet)'}</div>
 				</div>
 			</div>
@@ -333,7 +333,7 @@
 		{#if rotated}
 			<div class="mt-4 grid gap-3">
 				<div class="rounded-box bg-base-200 p-4">
-					<div class="text-xs uppercase text-base-content/60">Org name</div>
+					<div class="text-xs uppercase text-base-content/60">Org code</div>
 					<div class="font-mono break-all">{rotated.orgName}</div>
 				</div>
 				<div class="rounded-box bg-base-200 p-4">

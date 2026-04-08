@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getDeviceOptions, SERVER_ORIGIN } from '$lib/api';
+	import { getDeviceOptions, getResolvedServerOrigin } from '$lib/api';
 	import { loadConfig } from '$lib/deviceStorage';
 	import { loadConnection } from '$lib/deviceStorage';
 	import { saveConfig } from '$lib/deviceStorage';
@@ -64,7 +64,7 @@
 		const tick = async () => {
 			try {
 				const appVersion = await getVersion().catch(() => null);
-				await fetch(`${SERVER_ORIGIN}/api/device/telemetry`, {
+				await fetch(`${getResolvedServerOrigin()}/api/device/telemetry`, {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({
@@ -163,20 +163,22 @@
 	}
 </script>
 
-<div class="space-y-6">
+<div class="space-y-8">
 	{#if uiError}
-		<div class="alert alert-error"><span>{uiError}</span></div>
+		<div class="alert alert-error rounded-xl"><span>{uiError}</span></div>
 	{/if}
 
-	<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-		<div class="flex flex-wrap items-end gap-2">
+	<div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+		<div class="min-w-0 flex-1 space-y-3">
 			<div>
-				<h1 class="text-2xl font-semibold">Allowed websites</h1>
-				<p class="text-sm text-base-content/70">Pick a site to open it in the secured browser window.</p>
+				<h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Allowed sites</h1>
+				<p class="mt-1 max-w-xl text-sm leading-relaxed text-base-content/65">
+					Choose a site to open it in a separate secured window. Only allowlisted destinations load.
+				</p>
 			</div>
 			<button
 				type="button"
-				class="btn btn-outline btn-sm gap-1"
+				class="btn btn-outline btn-sm gap-2 rounded-lg"
 				onclick={() => refreshFromServer()}
 				disabled={refreshBusy || !hasConnection}
 				aria-busy={refreshBusy}
@@ -189,39 +191,39 @@
 		</div>
 
 		{#if cfg?.proxy}
-			<div class="rounded-box bg-base-200 px-4 py-3 text-sm">
-				<div class="text-xs uppercase text-base-content/60">Proxy (masked)</div>
-				<div class="font-mono tracking-wide">{formatObfuscatedProxy(cfg.proxy)}</div>
-				<div class="mt-1 text-xs text-base-content/50">Real endpoint is applied when opening sites.</div>
+			<div
+				class="w-full shrink-0 rounded-2xl border border-base-300/50 bg-base-100 px-5 py-4 text-sm shadow-sm lg:max-w-sm"
+			>
+				<div class="text-[0.65rem] font-semibold uppercase tracking-wider text-base-content/50">
+					Proxy (masked)
+				</div>
+				<div class="mt-2 font-mono text-sm tracking-wide">{formatObfuscatedProxy(cfg.proxy)}</div>
+				<p class="mt-2 text-xs leading-snug text-base-content/50">Used when opening site windows.</p>
 			</div>
 		{/if}
 	</div>
 
 	{#if refreshMessage}
-		<div class="alert alert-warning py-2 text-sm"><span>{refreshMessage}</span></div>
+		<div class="alert alert-warning rounded-xl py-3 text-sm"><span>{refreshMessage}</span></div>
 	{/if}
 
 	{#if !cfg}
-		<div class="card bg-base-100 shadow">
-			<div class="card-body">
-				<p class="text-sm text-base-content/70">No config yet. Connect first.</p>
-			</div>
+		<div class="rounded-2xl border border-base-300/60 bg-base-100 p-8 text-center shadow-sm">
+			<p class="text-sm text-base-content/65">No config yet. Use Connect if you were signed out.</p>
 		</div>
 	{:else if cfg.sites.length === 0}
-		<div class="card bg-base-100 shadow">
-			<div class="card-body">
-				<p class="text-sm text-base-content/70">No allowlisted sites configured for this org.</p>
-			</div>
+		<div class="rounded-2xl border border-base-300/60 bg-base-100 p-8 text-center shadow-sm">
+			<p class="text-sm text-base-content/65">No allowlisted sites for this organization yet.</p>
 		</div>
 	{:else}
 		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 			{#each cfg.sites as s (s.id)}
 				<button
 					type="button"
-					class="card bg-base-100 shadow transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+					class="group rounded-2xl border border-base-300/50 bg-base-100 p-0 text-left shadow-sm transition hover:border-primary/25 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
 					onclick={() => open(patternToStartUrl(s.urlPattern))}
 				>
-					<div class="card-body">
+					<div class="p-4 sm:p-5">
 						<div class="flex items-center gap-3">
 							{#if faviconUrlForPattern(s.urlPattern)}
 								<img
@@ -239,8 +241,10 @@
 							{/if}
 
 							<div class="min-w-0 text-left">
-								<div class="truncate text-lg font-semibold">{s.label}</div>
-								<div class="truncate text-xs text-base-content/60">
+								<div class="truncate text-base font-semibold tracking-tight group-hover:text-primary sm:text-lg">
+									{s.label}
+								</div>
+								<div class="truncate text-xs text-base-content/55">
 									{(() => {
 										try {
 											return new URL(patternToStartUrl(s.urlPattern)).hostname.replace(/^www\./, '');

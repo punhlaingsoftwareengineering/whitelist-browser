@@ -8,8 +8,17 @@ export function randomSecret(bytes = 32) {
 	return crypto.randomBytes(bytes).toString('base64url');
 }
 
-export function randomOrgName() {
-	// human-ish identifier; uniqueness enforced by DB index for active secrets
-	return `org_${crypto.randomBytes(6).toString('hex')}`;
+/**
+ * Stable "code name" from a human org name, e.g. "Pun Hlaing Hospitals" -> "pun_hlaing_hospitals".
+ * Used by desktop connect as `orgName`.
+ */
+export function orgCodeFromName(name: string) {
+	const slug = name
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '_')
+		.replace(/^_+|_+$/g, '')
+		.replace(/_+/g, '_');
+	return slug || `org_${crypto.randomBytes(3).toString('hex')}`;
 }
 

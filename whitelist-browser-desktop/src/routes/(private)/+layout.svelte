@@ -24,7 +24,7 @@
 		void resolveAppVersion().then((v) => (appVersion = v));
 	});
 
-	onMount(() => {
+	function runVerify() {
 		const conn = loadConnection();
 		if (!conn) {
 			goto('/auth/connect');
@@ -33,22 +33,25 @@
 
 		verifying = true;
 		verifyError = null;
-		getDeviceOptionsWithTimeout(conn.orgId, conn.deviceId, 2500)
+		getDeviceOptionsWithTimeout(conn.orgId, conn.deviceId, 8000)
 			.then((opt) => {
-				// if revoked, treat as logout
 				if (opt.status === 'REJECTED' || opt.status === 'IGNORED') {
 					clearConnection();
 					goto('/auth/connect?status=revoked');
 					return;
 				}
+				verifyError = null;
 				verifying = false;
 			})
 			.catch(() => {
-				// Security requirement: no offline access to private pages.
-				clearConnection();
-				verifyError = 'Cannot reach server. Please reconnect.';
-				goto('/auth/connect?status=server_unreachable');
+				verifyError =
+					'Could not reach the server. You can keep using the last saved sites below, or retry. Use Disconnect to sign out.';
+				verifying = false;
 			});
+	}
+
+	onMount(() => {
+		runVerify();
 	});
 
 	async function checkUpdates() {
@@ -75,7 +78,6 @@
 		try {
 			await handle.downloadAndInstall((evt: DownloadEvent) => {
 				if (evt.event === 'Progress') {
-					// we only get chunk lengths here without total; show an indeterminate-ish progress
 					updateState = {
 						kind: 'downloading',
 						handle,
@@ -91,18 +93,32 @@
 	}
 </script>
 
-<div class="min-h-screen bg-base-200">
-	<div class="navbar bg-base-100">
-		<div class="navbar-start flex flex-col items-start gap-0 sm:flex-row sm:items-baseline sm:gap-2">
-			<a class="btn btn-ghost text-xl" href="/home">Whitelist Browser</a>
+<div class="min-h-screen bg-gradient-to-b from-base-200 to-base-300">
+	{#if verifyError}
+		<div
+			class="flex flex-wrap items-center justify-between gap-3 border-b border-warning/30 bg-warning/10 px-4 py-3 text-sm"
+			role="alert"
+		>
+			<span class="text-base-content/90">{verifyError}</span>
+			<button type="button" class="btn btn-warning btn-sm shrink-0" onclick={() => runVerify()}>
+				Retry connection
+			</button>
+		</div>
+	{/if}
+
+	<header class="navbar border-b border-base-300/80 bg-base-100/90 px-2 shadow-sm backdrop-blur-sm sm:px-4">
+		<div class="navbar-start min-w-0 flex-1 gap-3">
+			<a class="btn btn-ghost shrink truncate px-2 text-lg font-semibold tracking-tight sm:text-xl" href="/home"
+				>Whitelist Browser</a
+			>
 			{#if appVersion}
-				<span class="px-2 text-xs text-base-content/50 tabular-nums sm:pb-1">v{appVersion}</span>
+				<span class="hidden text-xs text-base-content/45 tabular-nums sm:inline">v{appVersion}</span>
 			{/if}
 		</div>
-		<div class="navbar-end">
-			<button class="btn btn-ghost" type="button" onclick={checkUpdates}>Check updates</button>
+		<div class="navbar-end shrink-0 gap-1">
+			<button class="btn btn-ghost btn-sm" type="button" onclick={checkUpdates}>Updates</button>
 			<button
-				class="btn btn-ghost"
+				class="btn btn-ghost btn-sm text-error"
 				type="button"
 				onclick={() => {
 					clearConnection();
@@ -112,31 +128,36 @@
 				Disconnect
 			</button>
 		</div>
-	</div>
+	</header>
 
-	<div class="mx-auto max-w-6xl p-6">
+	<main class="mx-auto max-w-6xl px-4 py-8 sm:px-6">
 		{#if verifying}
-			<div class="flex min-h-[50vh] items-center justify-center">
-				<span class="loading loading-spinner loading-lg" aria-label="Verifying"></span>
+			<div class="flex min-h-[45vh] flex-col items-center justify-center gap-3">
+				<span class="loading loading-spinner loading-lg text-primary" aria-label="Verifying"></span>
+				<p class="text-sm text-base-content/60">Checking with server…</p>
 			</div>
 		{:else}
 			{@render children()}
 		{/if}
-	</div>
+	</main>
 </div>
 
 <dialog id="modal-update" class="modal">
-	<div class="modal-box">
-		<h3 class="font-bold text-lg">Updates</h3>
+	<div class="modal-box rounded-2xl">
+		<h3 class="text-lg font-semibold">Updates</h3>
 
 		{#if updateState.kind === 'checking'}
 			<p class="mt-2 text-sm text-base-content/70">Checking for updates…</p>
 		{:else if updateState.kind === 'none'}
 			<p class="mt-2 text-sm text-base-content/70">You’re up to date.</p>
 		{:else if updateState.kind === 'available'}
-			<p class="mt-2 text-sm text-base-content/70">Update available: <span class="font-mono">{updateState.version}</span></p>
+			<p class="mt-2 text-sm text-base-content/70">
+				Update available: <span class="font-mono">{updateState.version}</span>
+			</p>
 			{#if updateState.notes}
-				<div class="mt-3 rounded-box bg-base-200 p-3 text-sm whitespace-pre-wrap">{updateState.notes}</div>
+				<div class="mt-3 max-h-48 overflow-y-auto rounded-xl bg-base-200 p-3 text-sm whitespace-pre-wrap">
+					{updateState.notes}
+				</div>
 			{/if}
 		{:else if updateState.kind === 'downloading'}
 			<p class="mt-2 text-sm text-base-content/70">Downloading and installing…</p>
@@ -144,8 +165,8 @@
 		{:else if updateState.kind === 'error'}
 			<div class="alert alert-error mt-3"><span>{updateState.message}</span></div>
 			<p class="mt-2 text-sm text-base-content/70">
-				Confirm `src-tauri/tauri.conf.json` has your updater `pubkey`, and the latest GitHub release includes a valid
-				<code class="font-mono text-xs">latest.json</code> plus signed bundles (see Tauri updater docs).
+				Confirm updater <code class="rounded bg-base-200 px-1 font-mono text-xs">pubkey</code> and GitHub release
+				<code class="rounded bg-base-200 px-1 font-mono text-xs">latest.json</code>.
 			</p>
 		{/if}
 
@@ -157,4 +178,3 @@
 		</div>
 	</div>
 </dialog>
-
