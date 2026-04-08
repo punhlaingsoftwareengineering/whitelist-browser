@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "whitelist-browser-desktop",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.punhlainghospital.whitelist-browser-desktop",
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:5174",
@@ -37,11 +37,11 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_TAURI_UPDATER_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ5OTIzMDVCMkU3MUZCQjIKUldTeSszRXVXekNTMmJ3WDhyUU1HeENjUngrdnVLTmZZMEU4NHZFby93blQyNFByY1ZOcmRMbGEK",
       "endpoints": [
-        "http://localhost:5173/api/updates/v2?target={{target}}&current_version={{current_version}}&channel=stable"
-      ],
-      "dangerousInsecureTransportProtocol": true
+        "https://github.com/punhlaingsoftwareengineering/whitelist-browser/releases/latest/download/latest.json"
+      ]
     }
   }
 }
+

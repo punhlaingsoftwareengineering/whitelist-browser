@@ -1,0 +1,91 @@
+# Builds whitelist-browser-desktop for Linux, Windows, and macOS (x64 + Apple Silicon),
+# uploads installers to a GitHub Release, and publishes latest.json for the Tauri updater.
+#
+# Prerequisites:
+# - Bump version in whitelist-browser-desktop/src-tauri/tauri.conf.json and src-tauri/Cargo.toml.
+# - Repository secrets (Settings → Secrets → Actions):
+#     TAURI_SIGNING_PRIVATE_KEY         — full contents of your minisign private key file (.key)
+#     TAURI_SIGNING_PRIVATE_KEY_PASSWORD — optional; omit or leave empty if the key has no password
+#
+# Trigger: push a tag matching v* (e.g. v0.2.0), or run the workflow manually.
+
+name: Tauri desktop release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: whitelist-browser-desktop
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: whitelist-browser-desktop/pnpm-lock.yaml
+
+      - name: Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Linux dependencies (WebKitGTK)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and upload to GitHub Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: whitelist-browser-desktop
+          tauriScript: pnpm exec tauri
+          tagName: v__VERSION__
+          releaseName: Whitelist Browser Desktop v__VERSION__
+          releaseBody: |
+            Installers and update bundles for Linux, Windows, and macOS.
+
+            **Auto-updates:** this release includes `latest.json` for the in-app updater (see `tauri.conf.json` endpoints).
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}

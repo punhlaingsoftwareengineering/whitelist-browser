@@ -4,8 +4,10 @@
 	import { clearConnection, loadConnection } from '$lib/deviceStorage';
 	import { checkForUpdate, relaunchApp, type DownloadEvent, type UpdateHandle } from '$lib/updater';
 	import { getDeviceOptionsWithTimeout } from '$lib/api';
+	import { resolveAppVersion } from '$lib/appVersion';
 
 	let { children } = $props();
+	let appVersion = $state<string | null>(null);
 	type UpdateState =
 		| { kind: 'idle' }
 		| { kind: 'checking' }
@@ -17,6 +19,10 @@
 	let updateState = $state<UpdateState>({ kind: 'idle' });
 	let verifying = $state(true);
 	let verifyError = $state<string | null>(null);
+
+	onMount(() => {
+		void resolveAppVersion().then((v) => (appVersion = v));
+	});
 
 	onMount(() => {
 		const conn = loadConnection();
@@ -87,8 +93,11 @@
 
 <div class="min-h-screen bg-base-200">
 	<div class="navbar bg-base-100">
-		<div class="navbar-start">
+		<div class="navbar-start flex flex-col items-start gap-0 sm:flex-row sm:items-baseline sm:gap-2">
 			<a class="btn btn-ghost text-xl" href="/home">Whitelist Browser</a>
+			{#if appVersion}
+				<span class="px-2 text-xs text-base-content/50 tabular-nums sm:pb-1">v{appVersion}</span>
+			{/if}
 		</div>
 		<div class="navbar-end">
 			<button class="btn btn-ghost" type="button" onclick={checkUpdates}>Check updates</button>
@@ -135,7 +144,8 @@
 		{:else if updateState.kind === 'error'}
 			<div class="alert alert-error mt-3"><span>{updateState.message}</span></div>
 			<p class="mt-2 text-sm text-base-content/70">
-				Make sure `src-tauri/tauri.conf.json` has a real updater `pubkey`, and the server endpoint returns a signed artifact.
+				Confirm `src-tauri/tauri.conf.json` has your updater `pubkey`, and the latest GitHub release includes a valid
+				<code class="font-mono text-xs">latest.json</code> plus signed bundles (see Tauri updater docs).
 			</p>
 		{/if}
 

@@ -6,7 +6,8 @@
 	import { saveConfig } from '$lib/deviceStorage';
 	import { clearConnection } from '$lib/deviceStorage';
 	import { isAllowed as isAllowedPattern } from '$lib/allowlist';
-	import { openOrReuseBrowserWindow } from '$lib/tauriBrowser';
+	import { openBrowserWindow } from '$lib/tauriBrowser';
+	import { formatObfuscatedProxy } from '$lib/proxyDisplay';
 	import { goto } from '$app/navigation';
 	import { getVersion } from '@tauri-apps/api/app';
 	import { invoke } from '@tauri-apps/api/core';
@@ -21,6 +22,9 @@
 		os_version?: string;
 		arch?: string;
 	} | null>(null);
+	let hasConnection = $state(false);
+	let refreshBusy = $state(false);
+	let refreshMessage = $state<string | null>(null);
 
 	onMount(() => {
 		cfg = loadConfig();
@@ -28,6 +32,7 @@
 		current = cfg?.sites?.[0] ? patternToStartUrl(cfg.sites[0].urlPattern) : null;
 
 		const conn = loadConnection();
+		hasConnection = !!conn;
 		if (!conn) return;
 
 		// Best-effort: collect richer device info from Tauri backend.
@@ -44,6 +49,7 @@
 			.then((opt) => {
 				if (opt.status === 'REJECTED' || opt.status === 'IGNORED') {
 					clearConnection();
+					hasConnection = false;
 					goto('/auth/connect');
 					return;
 				}
@@ -114,7 +120,7 @@
 			new URL(url).hostname.replace(/^www\./, '');
 		const title = `${siteLabel} - Whitelist Browser`;
 
-		openOrReuseBrowserWindow(url, title).catch((e) => {
+		openBrowserWindow(url, title, cfg?.proxy ?? null).catch((e) => {
 			uiError = e instanceof Error ? e.message : 'Failed to open browser window';
 		});
 	}
@@ -128,6 +134,33 @@
 			return null;
 		}
 	}
+
+	async function refreshFromServer() {
+		const conn = loadConnection();
+		if (!conn) {
+			refreshMessage = 'Not connected.';
+			return;
+		}
+		refreshBusy = true;
+		refreshMessage = null;
+		uiError = null;
+		try {
+			const opt = await getDeviceOptions(conn.orgId, conn.deviceId);
+			if (opt.status === 'REJECTED' || opt.status === 'IGNORED') {
+				clearConnection();
+				hasConnection = false;
+				goto('/auth/connect');
+				return;
+			}
+			cfg = { proxy: opt.proxy ?? null, sites: opt.sites ?? [] };
+			saveConfig(cfg);
+			if (!current) current = cfg.sites?.[0] ? patternToStartUrl(cfg.sites[0].urlPattern) : null;
+		} catch (e) {
+			refreshMessage = e instanceof Error ? e.message : 'Could not refresh from server.';
+		} finally {
+			refreshBusy = false;
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -135,19 +168,38 @@
 		<div class="alert alert-error"><span>{uiError}</span></div>
 	{/if}
 
-	<div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-		<div>
-			<h1 class="text-2xl font-semibold">Allowed websites</h1>
-			<p class="text-sm text-base-content/70">Pick a site to open it in the secured browser window.</p>
+	<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+		<div class="flex flex-wrap items-end gap-2">
+			<div>
+				<h1 class="text-2xl font-semibold">Allowed websites</h1>
+				<p class="text-sm text-base-content/70">Pick a site to open it in the secured browser window.</p>
+			</div>
+			<button
+				type="button"
+				class="btn btn-outline btn-sm gap-1"
+				onclick={() => refreshFromServer()}
+				disabled={refreshBusy || !hasConnection}
+				aria-busy={refreshBusy}
+			>
+				{#if refreshBusy}
+					<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
+				{/if}
+				Refresh
+			</button>
 		</div>
 
 		{#if cfg?.proxy}
 			<div class="rounded-box bg-base-200 px-4 py-3 text-sm">
-				<div class="text-xs uppercase text-base-content/60">Proxy</div>
-				<div class="font-mono">{cfg.proxy.host}:{cfg.proxy.port}</div>
+				<div class="text-xs uppercase text-base-content/60">Proxy (masked)</div>
+				<div class="font-mono tracking-wide">{formatObfuscatedProxy(cfg.proxy)}</div>
+				<div class="mt-1 text-xs text-base-content/50">Real endpoint is applied when opening sites.</div>
 			</div>
 		{/if}
 	</div>
+
+	{#if refreshMessage}
+		<div class="alert alert-warning py-2 text-sm"><span>{refreshMessage}</span></div>
+	{/if}
 
 	{#if !cfg}
 		<div class="card bg-base-100 shadow">
