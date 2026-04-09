@@ -41,6 +41,15 @@ export function proxyUrlFromOrgProxy(proxy: OrgProxy | null | undefined): string
 	}
 }
 
+function isWindowsOs(): boolean {
+	if (typeof navigator === 'undefined') return false;
+	const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+	const p = nav.userAgentData?.platform;
+	if (p === 'Windows') return true;
+	const ua = navigator.userAgent ?? '';
+	return /Windows|Win32|Win64/i.test(ua);
+}
+
 async function resolveParentWindowLabel(): Promise<string> {
 	try {
 		const { getCurrentWindow } = await import('@tauri-apps/api/window');
@@ -56,8 +65,7 @@ async function browserWindowOptions(
 	proxy: OrgProxy | null | undefined
 ) {
 	const proxyUrl = proxyUrlFromOrgProxy(proxy);
-	const parent = await resolveParentWindowLabel();
-	return {
+	const base = {
 		url,
 		title: title ?? 'Whitelist Browser',
 		width: 1100,
@@ -65,9 +73,16 @@ async function browserWindowOptions(
 		resizable: true,
 		visible: true,
 		focus: true,
-		parent,
 		...(proxyUrl ? { proxyUrl } : {})
 	};
+
+	// Owned child windows on Windows can interfere with WebView2; keep browser windows top-level there.
+	if (isWindowsOs()) {
+		return base;
+	}
+
+	const parent = await resolveParentWindowLabel();
+	return { ...base, parent };
 }
 
 function newBrowserWindowLabel(): string {
@@ -106,6 +121,13 @@ export async function openBrowserWindow(url: string, title?: string, proxy?: Org
 
 	const label = newBrowserWindowLabel();
 	const options = await browserWindowOptions(url, title, proxy);
+
+	// WebView2 reentrancy: creating a webview from the same stack as a webview event (e.g. click)
+	// can deadlock or never complete on Windows. Yield to the browser event loop first.
+	// See https://github.com/tauri-apps/wry/issues/583 and MS WebView2 threading docs.
+	await new Promise<void>((r) => {
+		window.setTimeout(() => r(), 0);
+	});
 
 	return new Promise<void>((resolve, reject) => {
 		const win = new WebviewWindow(label, options);
