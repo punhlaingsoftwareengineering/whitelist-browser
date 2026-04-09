@@ -1,20 +1,62 @@
 export type OrgProxy = { host: string; port: number };
 
+const ALPHA = 'abcdefghijklmnopqrstuvwxyz';
+
+function randomAlphaSegment(len: number): string {
+	const out: string[] = [];
+	const buf = new Uint8Array(len);
+	crypto.getRandomValues(buf);
+	for (let i = 0; i < len; i++) {
+		out.push(ALPHA[buf[i]! % 26]!);
+	}
+	return out.join('');
+}
+
 /**
  * Tauri accepts `http://` (HTTP CONNECT) or `socks5://` URLs. The org admin UI only
  * stores host + port; we assume an HTTP proxy (typical for corporate egress).
+ *
+ * Normalizes host (strips accidental scheme/path), brackets IPv6 literals, validates via URL.
  */
 export function proxyUrlFromOrgProxy(proxy: OrgProxy | null | undefined): string | undefined {
 	if (!proxy) return undefined;
-	const host = proxy.host?.trim();
+	let host = proxy.host?.trim() ?? '';
 	if (!host) return undefined;
+	host = host.replace(/^https?:\/\//i, '');
+	const slash = host.indexOf('/');
+	if (slash >= 0) host = host.slice(0, slash);
+	host = host.trim();
+	if (!host) return undefined;
+
 	const port = Number(proxy.port);
 	if (!Number.isFinite(port) || port < 1 || port > 65535) return undefined;
-	return `http://${host}:${port}`;
+
+	const hostForUrl = host.startsWith('[') ? host : host.includes(':') ? `[${host}]` : host;
+	try {
+		const u = new URL(`http://${hostForUrl}:${port}/`);
+		if (!u.hostname) return undefined;
+		return u.href.replace(/\/$/, '');
+	} catch {
+		return undefined;
+	}
 }
 
-function browserWindowOptions(url: string, title: string | undefined, proxy: OrgProxy | null | undefined) {
+async function resolveParentWindowLabel(): Promise<string> {
+	try {
+		const { getCurrentWindow } = await import('@tauri-apps/api/window');
+		return getCurrentWindow().label;
+	} catch {
+		return 'main';
+	}
+}
+
+async function browserWindowOptions(
+	url: string,
+	title: string | undefined,
+	proxy: OrgProxy | null | undefined
+) {
 	const proxyUrl = proxyUrlFromOrgProxy(proxy);
+	const parent = await resolveParentWindowLabel();
 	return {
 		url,
 		title: title ?? 'Whitelist Browser',
@@ -23,23 +65,34 @@ function browserWindowOptions(url: string, title: string | undefined, proxy: Org
 		resizable: true,
 		visible: true,
 		focus: true,
+		parent,
 		...(proxyUrl ? { proxyUrl } : {})
 	};
 }
 
 function newBrowserWindowLabel(): string {
-	// Each WebviewWindow needs a unique label; allows many site windows for multitasking.
-	if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-		return `browser-${crypto.randomUUID()}`;
+	// Webview labels: documented charset a-zA-Z-/:_ (avoid digits for strict backends).
+	return `browser-${randomAlphaSegment(4)}-${randomAlphaSegment(4)}-${randomAlphaSegment(8)}`;
+}
+
+function errorFromTauriEvent(e: unknown): Error {
+	if (e instanceof Error) return e;
+	if (typeof e === 'string') return new Error(e);
+	if (e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string') {
+		return new Error((e as { message: string }).message);
 	}
-	return `browser-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+	try {
+		return new Error(JSON.stringify(e));
+	} catch {
+		return new Error('Failed to create browser window');
+	}
 }
 
 /**
  * Opens a new Tauri WebviewWindow for browsing (main app window stays single).
  *
  * Note: This is intentionally client-only; it no-ops during SSR.
- * When `proxy` is set, it is applied at webview creation (WebKitGTK / WebView2).
+ * When `proxy` is set, it is applied at webview creation (WebKitGTK / WebView2 / macOS with `macos-proxy`).
  */
 export async function openBrowserWindow(url: string, title?: string, proxy?: OrgProxy | null) {
 	if (typeof window === 'undefined') return;
@@ -52,10 +105,13 @@ export async function openBrowserWindow(url: string, title?: string, proxy?: Org
 	}
 
 	const label = newBrowserWindowLabel();
-	const win = new WebviewWindow(label, browserWindowOptions(url, title, proxy));
+	const options = await browserWindowOptions(url, title, proxy);
 
-	win.once('tauri://error', (e: unknown) => {
-		// eslint-disable-next-line no-console
-		console.error('Browser window error', e);
+	return new Promise<void>((resolve, reject) => {
+		const win = new WebviewWindow(label, options);
+		win.once('tauri://created', () => resolve());
+		win.once('tauri://error', (e: unknown) => {
+			reject(errorFromTauriEvent(e));
+		});
 	});
 }
