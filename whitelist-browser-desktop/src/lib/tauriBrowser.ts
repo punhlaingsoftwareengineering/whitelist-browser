@@ -78,7 +78,12 @@ async function browserWindowOptions(
 
 	// Owned child windows on Windows can interfere with WebView2; keep browser windows top-level there.
 	if (isWindowsOs()) {
-		return base;
+		// Without this, Tauri gives every webview the same default WebView2 user-data dir. A second
+		// webview with a different `proxyUrl` then shares that profile with the main window, which
+		// WebView2 rejects — the window flashes and exits. A relative `dataDirectory` is resolved to
+		// `%LOCALAPPDATA%/<window-label>/…`, unique per site window. See tauri-utils WindowConfig
+		// (dataDirectory) and WebView2 multi-profile constraints.
+		return { ...base, dataDirectory: 'whitelist-site-wv' };
 	}
 
 	const parent = await resolveParentWindowLabel();
@@ -107,7 +112,8 @@ function errorFromTauriEvent(e: unknown): Error {
  * Opens a new Tauri WebviewWindow for browsing (main app window stays single).
  *
  * Note: This is intentionally client-only; it no-ops during SSR.
- * When `proxy` is set, it is applied at webview creation (WebKitGTK / WebView2 / macOS with `macos-proxy`).
+ * When `proxy` is set, it is applied at webview creation (WebKitGTK / WebView2; macOS needs the
+ * `macos-proxy` Cargo feature on the Tauri crate).
  */
 export async function openBrowserWindow(url: string, title?: string, proxy?: OrgProxy | null) {
 	if (typeof window === 'undefined') return;
