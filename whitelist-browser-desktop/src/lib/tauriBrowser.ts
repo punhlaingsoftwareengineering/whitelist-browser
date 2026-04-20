@@ -76,16 +76,7 @@ async function browserWindowOptions(
 		...(proxyUrl ? { proxyUrl } : {})
 	};
 
-	// Owned child windows on Windows can interfere with WebView2; keep browser windows top-level there.
-	if (isWindowsOs()) {
-		// Without this, Tauri gives every webview the same default WebView2 user-data dir. A second
-		// webview with a different `proxyUrl` then shares that profile with the main window, which
-		// WebView2 rejects — the window flashes and exits. A relative `dataDirectory` is resolved to
-		// `%LOCALAPPDATA%/<window-label>/…`, unique per site window. See tauri-utils WindowConfig
-		// (dataDirectory) and WebView2 multi-profile constraints.
-		return { ...base, dataDirectory: 'whitelist-site-wv' };
-	}
-
+	// Windows uses `wb_open_site_window` (Rust) instead of this path.
 	const parent = await resolveParentWindowLabel();
 	return { ...base, parent };
 }
@@ -114,9 +105,32 @@ function errorFromTauriEvent(e: unknown): Error {
  * Note: This is intentionally client-only; it no-ops during SSR.
  * When `proxy` is set, it is applied at webview creation (WebKitGTK / WebView2; macOS needs the
  * `macos-proxy` Cargo feature on the Tauri crate).
+ *
+ * **Windows:** Uses the `wb_open_site_window` Rust command so the webview is created outside the
+ * WebView2 UI event stack (wry#583) with an isolated `data_directory` and optional `http://` proxy
+ * (same shape as Firefox “HTTP proxy” for HTTPS).
  */
 export async function openBrowserWindow(url: string, title?: string, proxy?: OrgProxy | null) {
 	if (typeof window === 'undefined') return;
+
+	const label = newBrowserWindowLabel();
+	const proxyUrl = proxyUrlFromOrgProxy(proxy) ?? null;
+
+	if (isWindowsOs()) {
+		let invoke: typeof import('@tauri-apps/api/core').invoke;
+		try {
+			({ invoke } = await import('@tauri-apps/api/core'));
+		} catch {
+			throw new Error('Tauri API not available (are you running in the Tauri app window?)');
+		}
+		await invoke('wb_open_site_window', {
+			label,
+			url,
+			title: title ?? 'Whitelist Browser',
+			proxyUrl
+		});
+		return;
+	}
 
 	let WebviewWindow: typeof import('@tauri-apps/api/webviewWindow').WebviewWindow;
 	try {
@@ -125,7 +139,6 @@ export async function openBrowserWindow(url: string, title?: string, proxy?: Org
 		throw new Error('Tauri API not available (are you running in the Tauri app window?)');
 	}
 
-	const label = newBrowserWindowLabel();
 	const options = await browserWindowOptions(url, title, proxy);
 
 	// WebView2 reentrancy: creating a webview from the same stack as a webview event (e.g. click)

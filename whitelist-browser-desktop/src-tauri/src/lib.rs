@@ -1,6 +1,9 @@
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
+#[cfg(windows)]
+use tauri::Manager;
+use tauri::{Url, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Serialize)]
 struct DeviceSpec {
@@ -52,12 +55,62 @@ fn wb_storage_save(json: String) -> Result<(), String> {
   fs::write(path, json).map_err(|e| e.to_string())
 }
 
+/// Opens a dedicated site browsing window. On Windows this runs in an async command so WebView2
+/// is not created from the same call stack as a UI event (see wry#583). Uses a per-window
+/// `data_directory` so `proxy_url` does not share the main webview's user-data folder.
+#[tauri::command]
+async fn wb_open_site_window(
+  app: tauri::AppHandle,
+  label: String,
+  url: String,
+  title: String,
+  proxy_url: Option<String>,
+) -> Result<(), String> {
+  let parsed_url: Url = url.parse().map_err(|e| format!("invalid url: {e}"))?;
+
+  let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parsed_url))
+    .title(title)
+    .inner_size(1100.0, 800.0)
+    .resizable(true)
+    .visible(true)
+    .focused(true);
+
+  #[cfg(windows)]
+  {
+    let dir = app
+      .path()
+      .app_local_data_dir()
+      .map_err(|e| e.to_string())?
+      .join("site-webviews")
+      .join(&label);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    builder = builder.data_directory(dir);
+  }
+
+  if let Some(ref p) = proxy_url {
+    if !p.is_empty() {
+      let u: Url = p
+        .parse()
+        .map_err(|e| format!("invalid proxy url: {e}"))?;
+      builder = builder.proxy_url(u);
+    }
+  }
+
+  builder.build().map_err(|e| e.to_string())?;
+  Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
-    .invoke_handler(tauri::generate_handler![get_device_spec, wb_storage_load, wb_storage_save])
+    .invoke_handler(tauri::generate_handler![
+      get_device_spec,
+      wb_storage_load,
+      wb_storage_save,
+      wb_open_site_window
+    ])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
