@@ -15,7 +15,7 @@ To recreate this project with the same configuration:
 
 ```sh
 # recreate this project
-pnpm dlx sv@0.14.1 create --template minimal --types ts --add prettier eslint vitest="usages:unit,component" playwright tailwindcss="plugins:typography,forms" sveltekit-adapter="adapter:node" devtools-json drizzle="database:postgresql+postgresql:neon" better-auth="demo:password,github" mdsvex paraglide="languageTags:en+demo:no" mcp="ide:cursor+setup:local" --install pnpm whitelist-browser-server
+pnpm dlx sv@0.14.1 create --template minimal --types ts --add prettier eslint vitest="usages:unit,component" playwright tailwindcss="plugins:typography,forms" sveltekit-adapter="adapter:node" devtools-json drizzle="database:postgresql+postgresql:neon" better-auth="demo:password,github" mdsvex paraglide="languageTags:en+demo:no" mcp="ide:cursor+setup:local" --install pnpm dora-server
 ```
 
 ## Developing

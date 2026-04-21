@@ -21,7 +21,7 @@
 	<div class="navbar-start">
 		<button class="btn btn-ghost gap-2 text-xl" onclick={() => goto('/onboarding')}>
 			<LogoMark size={28} class="shrink-0" />
-			<span>Whitelist Browser</span>
+			<span>Dora</span>
 		</button>
 	</div>
 

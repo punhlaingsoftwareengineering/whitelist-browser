@@ -1,5 +1,6 @@
 const BUILTIN_ORIGINS = [
 	'https://dora.fly.dev',
+	'https://dora-server.fly.dev',
 	'http://localhost:5173',
 	'https://whitelist-browser.fly.dev',
 	'https://whitelist-browser-server.fly.dev'

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  DESKTOP_DIR: whitelist-browser-desktop
+  DESKTOP_DIR: dora-desktop
 
 jobs:
   create-release:

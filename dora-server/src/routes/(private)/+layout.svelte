@@ -10,7 +10,7 @@
 		<div class="navbar-start">
 			<a class="btn btn-ghost gap-2 text-xl" href="/home">
 				<LogoMark size={28} class="shrink-0" />
-				<span>Whitelist Browser</span>
+				<span>Dora</span>
 			</a>
 		</div>
 		<div class="navbar-center hidden lg:flex">

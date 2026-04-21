@@ -1,5 +1,5 @@
 {
-	"name": "whitelist-browser-server",
+	"name": "dora-server",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",

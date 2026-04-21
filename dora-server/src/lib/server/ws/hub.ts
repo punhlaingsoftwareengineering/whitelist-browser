@@ -58,9 +58,8 @@ class Hub {
 }
 
 declare global {
-	// eslint-disable-next-line no-var
-	var __whitelistBrowserHub: Hub | undefined;
+	var __doraHub: Hub | undefined;
 }
 
-export const hub: Hub = globalThis.__whitelistBrowserHub ?? (globalThis.__whitelistBrowserHub = new Hub());
+export const hub: Hub = globalThis.__doraHub ?? (globalThis.__doraHub = new Hub());
 

@@ -26,7 +26,7 @@ export const actions: Actions = {
 
 		await sendMail({
 			to: email,
-			subject: 'Your Whitelist Browser OTP code',
+			subject: 'Your Dora OTP code',
 			text: `Your OTP code is: ${otp}`,
 			html: `<p>Your OTP code is:</p><p style="font-size:24px; font-weight:700; letter-spacing:0.25em">${otp}</p>`
 		});

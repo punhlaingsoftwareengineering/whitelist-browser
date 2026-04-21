@@ -9,7 +9,7 @@
 	<main class="flex-1">{@render children()}</main>
 	<footer class="footer footer-center bg-base-200 p-6 text-base-content">
 		<aside>
-			<p>© {new Date().getFullYear()} Whitelist Browser</p>
+			<p>© {new Date().getFullYear()} Dora</p>
 		</aside>
 	</footer>
 </div>

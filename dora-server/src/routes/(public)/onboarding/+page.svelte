@@ -9,9 +9,9 @@
 			<div class="max-w-xl">
 				<div class="mb-4 flex items-center gap-3">
 					<LogoMark size={48} class="shrink-0" />
-					<span class="text-sm font-semibold uppercase tracking-wide text-base-content/60">Whitelist Browser</span>
+					<span class="text-sm font-semibold uppercase tracking-wide text-base-content/60">Dora</span>
 				</div>
-				<h1 class="text-4xl font-bold leading-tight">Whitelist-only browsing for your organization.</h1>
+				<h1 class="text-4xl font-bold leading-tight">Controlled browsing for your organization.</h1>
 				<p class="py-6 text-base-content/80">
 					Control which websites are accessible, enforce proxy settings, and approve devices before they can
 					connect — all from a simple admin dashboard.
@@ -45,7 +45,7 @@
 					<div class="card-body">
 						<div class="flex items-center gap-2">
 							<Globe size={18} />
-							<h2 class="card-title text-base">Allowlisted websites</h2>
+							<h2 class="card-title text-base">Allowed websites</h2>
 						</div>
 						<p class="text-sm text-base-content/70">Only allow the exact sites your users need.</p>
 					</div>

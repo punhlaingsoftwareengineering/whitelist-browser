@@ -163,7 +163,7 @@
 	<div class="flex flex-wrap items-start justify-between gap-4">
 		<div>
 			<h1 class="text-2xl font-bold">{org.name}</h1>
-			<p class="text-base-content/70">Proxy + allowlisted websites + device requests.</p>
+			<p class="text-base-content/70">Proxy + allowed websites + device requests.</p>
 		</div>
 		<button class="btn btn-outline" type="button" onclick={rotateSecret}>
 			<RotateCw size={18} />Generate org code & secret
@@ -233,7 +233,7 @@
 					</thead>
 					<tbody>
 						{#if sites.length === 0}
-							<tr><td colspan="3" class="text-base-content/70">No allowlisted sites yet.</td></tr>
+							<tr><td colspan="3" class="text-base-content/70">No allowed sites yet.</td></tr>
 						{:else}
 							{#each sites as s}
 								<tr>

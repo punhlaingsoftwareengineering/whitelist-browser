@@ -1,11 +1,11 @@
-# Whitelist Browser (SaaS)
+# Dora (SaaS)
 
-a browser embedded application where admin can set which websites are allowed to use, additionally tweaking proxy settings. think of this like SaaS so promote to other users.
+A browser-embedded application where an admin can choose which websites are allowed, with optional proxy settings. Positioned as SaaS for other organizations.
 
 ## Folder Structure
 
-> whitelist-browser-desktop (which is sveltekit and tauri application)
-> whitelist-browser-server (which is admin dashboard manage the request and give accesses, also managing the user proxy setting and available websites)
+> `dora-desktop` — SvelteKit + Tauri desktop client (product name: **Dora**)
+> `dora-server` — Admin dashboard for device requests, access, proxy, and allowed sites (product name: **Dora**)
 
 ## Dependencies
 
