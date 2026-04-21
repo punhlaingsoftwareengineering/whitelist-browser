@@ -13,6 +13,49 @@ use tauri::webview::NewWindowResponse;
 
 static BROWSER_LABEL_SEQ: AtomicU64 = AtomicU64::new(0);
 
+// Runs in the main frame of every site window. Forces normal link clicks to open a new window
+// (handled by `on_new_window`), so the new window keeps the same proxy + allowlist policy.
+const OPEN_LINKS_IN_NEW_WINDOW_SCRIPT: &str = r#"
+(() => {
+  if (window.__doraLinksNewWindowInstalled) return;
+  window.__doraLinksNewWindowInstalled = true;
+
+  function closestAnchor(el) {
+    while (el && el !== document.documentElement) {
+      if (el.tagName === 'A' && el.href) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  document.addEventListener('click', (e) => {
+    // Only handle normal left-clicks without modifiers.
+    if (e.defaultPrevented) return;
+    if (e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+    const a = closestAnchor(e.target);
+    if (!a) return;
+    const href = a.href;
+    if (!href) return;
+
+    // Only intercept http(s) navigations. Let mailto/tel/blob/data/etc behave normally.
+    if (!(href.startsWith('http://') || href.startsWith('https://'))) return;
+
+    // Allow explicit opt-out.
+    if (a.hasAttribute('data-dora-same-window')) return;
+
+    // Prevent in-window navigation; spawn a new window instead.
+    e.preventDefault();
+    try {
+      window.open(href, '_blank');
+    } catch {
+      // ignore
+    }
+  }, true);
+})();
+"#;
+
 fn app_device_storage_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
   let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
   fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -145,6 +188,8 @@ fn open_site_webview_window(
     .resizable(true)
     .visible(true)
     .focused(true);
+
+  builder = builder.initialization_script(OPEN_LINKS_IN_NEW_WINDOW_SCRIPT);
 
   if let Some(features) = opener_features {
     builder = builder.window_features(features);

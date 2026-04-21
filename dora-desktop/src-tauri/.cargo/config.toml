@@ -1,0 +1,5 @@
+[build]
+# Keep build artifacts inside this crate, independent of where `cargo` is invoked from.
+# This also avoids stale absolute paths if the project folder is renamed.
+target-dir = "target"
+
